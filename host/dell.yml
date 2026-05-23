@@ -10,6 +10,17 @@
     hermes_sudoers_file: /etc/sudoers.d/restart-hermes-stack
     hermes_restart_user: hermes
 
+    # Optional: install a periodic cron that checks for updates and
+    # restarts the stack only when a new commit is pulled.
+    # The cron runs as the restart user and uses sudo only for the
+    # restricted restart hook.
+    hermes_enable_self_update_cron: false
+    hermes_self_update_minute: "0"
+    hermes_self_update_hour: "*/6"
+    hermes_self_update_day: "*"
+    hermes_self_update_month: "*"
+    hermes_self_update_weekday: "*"
+
     # Optional: install a host-side Hermes CLI wrapper so you can run
     # `hermes` commands directly on the host terminal.
     #
@@ -62,6 +73,7 @@
           set -euo pipefail
 
           STACK_DIR="{{ hermes_stack_dir }}"
+          STACK_USER="{{ hermes_restart_user }}"
           SERVICE_LIST=({% for svc in hermes_systemd_services %}{{ svc | quote }} {% endfor %})
           COMPOSE_FILES=(
             {% for file in hermes_compose_files %}
@@ -73,17 +85,97 @@
             printf '[restart-hermes-stack] %s\n' "$*"
           }
 
-          run_git_update() {
-            if [ -d "$STACK_DIR/.git" ]; then
-              log "Updating git checkout in $STACK_DIR"
-              git -C "$STACK_DIR" pull --ff-only
+          repo_exec() {
+            if [ "$(id -un)" = "$STACK_USER" ] || [ "$STACK_USER" = "root" ]; then
+              "$@"
             else
-              log "Skipping git pull (no .git directory at $STACK_DIR)"
+              runuser -u "$STACK_USER" -- "$@"
             fi
           }
 
+          detect_update_remote() {
+            local branch remote
+            branch="$(repo_exec git -C "$STACK_DIR" branch --show-current 2>/dev/null || true)"
+            if [ -n "$branch" ]; then
+              remote="$(repo_exec git -C "$STACK_DIR" config --get "branch.${branch}.remote" 2>/dev/null || true)"
+              if [ -n "$remote" ] && repo_exec git -C "$STACK_DIR" remote get-url "$remote" >/dev/null 2>&1; then
+                printf '%s\n' "$remote"
+                return 0
+              fi
+            fi
+            if repo_exec git -C "$STACK_DIR" remote get-url upstream >/dev/null 2>&1; then
+              printf '%s\n' upstream
+            elif repo_exec git -C "$STACK_DIR" remote get-url origin >/dev/null 2>&1; then
+              printf '%s\n' origin
+            else
+              return 1
+            fi
+          }
+
+          detect_update_branch() {
+            local remote="$1" branch upstream_ref
+            branch="$(repo_exec git -C "$STACK_DIR" branch --show-current 2>/dev/null || true)"
+            if [ -n "$branch" ]; then
+              upstream_ref="$(repo_exec git -C "$STACK_DIR" rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || true)"
+              if [ -n "$upstream_ref" ]; then
+                printf '%s\n' "${upstream_ref#${remote}/}"
+              else
+                printf '%s\n' "$branch"
+              fi
+              return 0
+            fi
+            return 1
+          }
+
+          run_git_update() {
+            if [ ! -d "$STACK_DIR/.git" ]; then
+              log "Skipping git update (no .git directory at $STACK_DIR)"
+              return 1
+            fi
+
+            local remote branch head upstream ahead_behind
+            remote="$(detect_update_remote)" || {
+              log "Skipping git update (no origin/upstream remote configured)"
+              return 1
+            }
+            branch="$(detect_update_branch "$remote")" || {
+              log "Skipping git update (detached HEAD or no upstream branch configured)"
+              return 1
+            }
+
+            log "Checking for updates in $STACK_DIR from ${remote}/${branch}"
+            repo_exec git -C "$STACK_DIR" fetch --quiet "$remote" "$branch"
+
+            head="$(repo_exec git -C "$STACK_DIR" rev-parse HEAD)"
+            upstream="$(repo_exec git -C "$STACK_DIR" rev-parse "${remote}/${branch}")"
+
+            if [ "$head" = "$upstream" ]; then
+              log "Already up to date"
+              return 1
+            fi
+
+            if [ -n "$(repo_exec git -C "$STACK_DIR" status --porcelain)" ]; then
+              log "Working tree is dirty; skipping automatic pull to avoid clobbering local changes"
+              return 1
+            fi
+
+            ahead_behind="$(repo_exec git -C "$STACK_DIR" rev-list --left-right --count "HEAD...${remote}/${branch}" 2>/dev/null || true)"
+            log "Pulling updates (${ahead_behind:-unknown divergence})"
+            repo_exec git -C "$STACK_DIR" pull --ff-only "$remote" "$branch"
+            return 0
+          }
+
           run_compose_restart() {
+            local compose_cmd=()
             if ! command -v docker >/dev/null 2>&1; then
+              return 1
+            fi
+
+            if docker compose version >/dev/null 2>&1; then
+              compose_cmd=(docker compose)
+            elif command -v docker-compose >/dev/null 2>&1; then
+              compose_cmd=(docker-compose)
+            else
               return 1
             fi
 
@@ -100,8 +192,7 @@
             fi
 
             log "Restarting Docker Compose stack using $compose_file"
-            cd "$STACK_DIR"
-            docker compose -f "$compose_file" up -d --force-recreate --remove-orphans
+            repo_exec "${compose_cmd[@]}" -f "$STACK_DIR/$compose_file" up -d --build --force-recreate --remove-orphans
           }
 
           run_systemd_restart() {
@@ -113,15 +204,17 @@
             systemctl restart "${SERVICE_LIST[@]}"
           }
 
-          run_git_update
-
-          if run_compose_restart; then
-            log "Docker Compose restart complete"
-          elif run_systemd_restart; then
-            log "systemd restart complete"
+          if run_git_update; then
+            if run_compose_restart; then
+              log "Docker Compose update + restart complete"
+            elif run_systemd_restart; then
+              log "systemd update + restart complete"
+            else
+              log "Update completed, but no compose file or systemd services were available to restart"
+              exit 1
+            fi
           else
-            log "No compose file or systemd services configured; nothing to restart"
-            exit 1
+            log "No update detected; leaving services untouched"
           fi
 
     - name: Install a host-side Hermes CLI wrapper
@@ -222,6 +315,19 @@
         group: root
         mode: '0440'
 
+    - name: Install a periodic self-update cron for Hermes
+      ansible.builtin.cron:
+        name: "Hermes self-update and restart"
+        cron_file: hermes-self-update
+        user: "{{ hermes_restart_user }}"
+        minute: "{{ hermes_self_update_minute }}"
+        hour: "{{ hermes_self_update_hour }}"
+        day: "{{ hermes_self_update_day }}"
+        month: "{{ hermes_self_update_month }}"
+        weekday: "{{ hermes_self_update_weekday }}"
+        job: "{{ '/usr/bin/sudo -n ' ~ hermes_restart_script if hermes_restart_user != 'root' else hermes_restart_script }}"
+      when: hermes_enable_self_update_cron | bool
+
     - name: Show what was installed
       ansible.builtin.debug:
         msg:
@@ -229,3 +335,4 @@
           - "Installed sudoers rule: {{ hermes_sudoers_file }}"
           - "Restart user: {{ hermes_restart_user }}"
           - "Stack directory: {{ hermes_stack_dir }}"
+          - "Self-update cron: {{ 'enabled' if hermes_enable_self_update_cron | bool else 'disabled' }}"

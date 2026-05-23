@@ -4,14 +4,19 @@ This directory contains Ansible assets for configuring a host machine so Hermes 
 
 ## Playbook
 
-- `dell.yml` — installs a restricted restart script and a sudoers rule allowing one user to run it without a password.
+- `dell.yml` — installs a restricted restart script, an optional cron check, a host CLI wrapper, and a sudoers rule allowing one user to run the restart hook without a password.
 
 ## Default behavior
 
+The installed script checks for updates first and only restarts when a new commit is pulled.
+
 The installed script will:
-1. `git pull --ff-only` if the Hermes stack directory is a git checkout
-2. Restart a Docker Compose stack if it finds a compose file
-3. Otherwise restart the systemd services listed in `hermes_systemd_services`
+1. `git fetch` and compare the local checkout against `origin`/`upstream`
+2. `git pull --ff-only` when updates are available
+3. Restart a Docker Compose stack if it finds a compose file
+4. Otherwise restart the systemd services listed in `hermes_systemd_services`
+
+A periodic cron can be enabled from the playbook so this check runs automatically every few hours, running as the restart user and using sudo only for the restricted hook.
 
 ## Host CLI wrapper
 
@@ -54,6 +59,8 @@ Override these when you run the playbook:
 - `hermes_docker_container` — container name for Docker CLI mode
 - `hermes_docker_user` — user for `docker exec` in Docker CLI mode; keep this as the Hermes runtime user to avoid root-owned config/auth files
 - `hermes_container_cli_path` — Hermes executable path inside the container
+- `hermes_enable_self_update_cron` — install a cron that runs the update/restart check automatically as the restart user
+- `hermes_self_update_minute/hour/day/month/weekday` — cron schedule fields for that periodic check
 
 ## Example
 
@@ -77,3 +84,5 @@ sudo /usr/local/bin/restart-hermes-stack
 If `hermes_install_default_cli_symlink` is enabled, you can use `hermes` directly on the host CLI.
 
 That host will then perform only the scripted restart workflow.
+
+If the cron option is enabled, the check will run automatically every six hours and only restart when updates are found.

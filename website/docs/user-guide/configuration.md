@@ -858,22 +858,24 @@ auxiliary:
 
   # Web page summarization + browser page text extraction
   web_extract:
-    provider: "auto"
-    model: ""                  # e.g. "google/gemini-2.5-flash"
+    provider: "gemini"
+    model: "gemini-3-flash-preview"  # fast/cheap side-task model
     base_url: ""
     api_key: ""
     timeout: 360               # seconds (6min) — per-attempt LLM summarization
 
   # Dangerous command approval classifier
   approval:
-    provider: "auto"
-    model: ""
+    provider: "openai-codex"
+    model: "gpt-5.4-mini"     # lightweight supervisor support
     base_url: ""
     api_key: ""
     timeout: 30                # seconds
 
   # Context compression timeout (separate from compression.* config)
   compression:
+    provider: "gemini"
+    model: "gemini-3-flash-preview"
     timeout: 120               # seconds — compression summarizes long conversations, needs more time
 
   # Skills hub — skill matching and search
@@ -886,8 +888,8 @@ auxiliary:
 
   # MCP tool dispatch
   mcp:
-    provider: "auto"
-    model: ""
+    provider: "openai-codex"
+    model: "gpt-5.4-mini"
     base_url: ""
     api_key: ""
     timeout: 30
@@ -898,8 +900,8 @@ auxiliary:
   # task to `todo`. Cheap fast models work well here; spec expansion
   # is short and doesn't need reasoning depth.
   triage_specifier:
-    provider: "auto"
-    model: ""
+    provider: "gemini"
+    model: "gemini-3-flash-preview"
     base_url: ""
     api_key: ""
     timeout: 120
@@ -1182,11 +1184,11 @@ display:
   bell_on_complete: false # Play terminal bell when agent finishes (great for long tasks)
   show_reasoning: false   # Show model reasoning/thinking above each response (toggle with /reasoning show|hide)
   streaming: false        # Stream tokens to terminal as they arrive (real-time output)
-  show_cost: false        # Show estimated $ cost in the CLI status bar
+  show_cost: true         # Show estimated $ cost in the CLI status bar
   timestamps: false       # When true, prefixes user and assistant labels with [HH:MM] timestamps in the CLI / TUI transcript
   tool_preview_length: 0  # Max chars for tool call previews (0 = no limit, show full paths/commands)
   runtime_footer:         # Gateway: append a runtime-context footer to final replies
-    enabled: false
+    enabled: true
     fields: ["model", "context_pct", "cwd"]
   file_mutation_verifier: true    # Append an advisory footer when write_file/patch calls failed this turn
   language: en            # UI language for static messages (approval prompts, some gateway replies). en | zh | zh-hant | ja | de | es | fr | tr | uk | af | ko | it | ga | pt | ru | hu

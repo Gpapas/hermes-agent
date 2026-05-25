@@ -144,7 +144,7 @@ If a token refresh fails with a terminal error (HTTP 4xx, `invalid_grant`, revok
 :::
 
 :::warning
-Even when using Nous Portal, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model. By default (`auxiliary.*.provider: "auto"`), Hermes routes these tasks to your **main chat model** — the same model you picked in `hermes model`. You can override each task individually to route it to a cheaper/faster model (e.g. Gemini Flash on OpenRouter) — see [Auxiliary Models](/docs/user-guide/configuration#auxiliary-models).
+Even when using Nous Portal, Codex, or a custom endpoint, some tools (vision, web summarization, MoA) use a separate "auxiliary" model. By default (`auxiliary.*.provider: "auto"`), Hermes routes these tasks to your **main chat model** — the same model you picked in `hermes model`. You can override each task individually to route it to a cheaper/faster model (for example, Gemini Flash via the Gemini provider, or OpenRouter-hosted Gemini Flash / other cheap models) — see [Auxiliary Models](/docs/user-guide/configuration#auxiliary-models).
 :::
 
 :::tip Nous Tool Gateway

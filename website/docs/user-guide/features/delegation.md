@@ -136,8 +136,8 @@ You can configure a different model for subagents via `config.yaml` — useful f
 ```yaml
 # In ~/.hermes/config.yaml
 delegation:
-  model: "google/gemini-flash-2.0"    # Cheaper model for subagents
-  provider: "openrouter"              # Optional: route subagents to a different provider
+  provider: "openrouter"              # Route leaf subagents to OpenRouter
+  model: "meta-llama/llama-3.1-8b-instruct"    # Cheap worker model for low-risk tasks
 ```
 
 If omitted, subagents use the same model as the parent.

@@ -643,26 +643,26 @@ There is no hard limit. Each profile is just a directory under `~/.hermes/profil
 
 ### Using different models for different tasks (multi-model workflows)
 
-**Scenario:** You use GPT-5.4 as your daily driver, but Gemini or Grok writes better social media content. Manually switching models every time is tedious.
+**Scenario:** You use GPT-5.5 Thinking as your daily driver, but cheap worker models are better for repetitive drafting or extraction. Manually switching routing every time is tedious.
 
 **Solution: Delegation config.** Hermes can route subagents to a different model automatically. Set this in `~/.hermes/config.yaml`:
 
 ```yaml
 delegation:
-  model: "google/gemini-3-flash-preview"   # subagents use this model
   provider: "openrouter"                    # provider for subagents
+  model: "meta-llama/llama-3.1-8b-instruct" # cheap worker model for leaf subagents
 ```
 
-Now when you tell Hermes "write me a Twitter thread about X" and it spawns a `delegate_task` subagent, that subagent runs on Gemini instead of your main model. Your primary conversation stays on GPT-5.4.
+Now when you tell Hermes to delegate a low-risk task, that subagent can run on an OpenRouter-hosted cheap model instead of your main model. Your primary conversation stays on GPT-5.5 Thinking.
 
-You can also be explicit in your prompt: *"Delegate a task to write social media posts about our product launch. Use your subagent for the actual writing."* The agent will use `delegate_task`, which automatically picks up the delegation config.
+You can also be explicit in your prompt: *"Delegate the extraction and formatting work to a subagent, keep the main reasoning in the supervisor."* The agent will use `delegate_task`, which automatically picks up the delegation config.
 
 For one-off model switches without delegation, use `/model` in the CLI:
 
 ```bash
-/model google/gemini-3-flash-preview    # switch for this session
-# ... write your content ...
-/model openai/gpt-5.4                   # switch back
+/model gpt-5.5-thinking              # switch to the supervisor model
+# ... work ...
+/model openrouter/meta-llama/llama-3.1-8b-instruct
 ```
 
 See [Subagent Delegation](../user-guide/features/delegation.md) for more on how delegation works.

@@ -171,6 +171,13 @@ class Mem0MemoryProvider(MemoryProvider):
             if self._client is not None:
                 return self._client
             try:
+                try:
+                    from tools.lazy_deps import ensure
+                    ensure("memory.mem0", prompt=False)
+                except Exception:
+                    # Preserve the clear import-time remediation below if
+                    # lazy installation is disabled or unavailable.
+                    pass
                 from mem0 import MemoryClient
                 self._client = MemoryClient(api_key=self._api_key)
                 return self._client

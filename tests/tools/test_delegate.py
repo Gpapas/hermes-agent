@@ -2089,13 +2089,13 @@ class TestMaxSpawnDepth(unittest.TestCase):
 
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": 99})
-    def test_max_spawn_depth_clamped_above_three(self, mock_cfg):
+    def test_max_spawn_depth_clamped_above_five(self, mock_cfg):
         import logging
         from tools.delegate_tool import _get_max_spawn_depth
         with self.assertLogs("tools.delegate_tool", level=logging.WARNING) as cm:
             result = _get_max_spawn_depth()
-        self.assertEqual(result, 3)
-        self.assertTrue(any("clamping to 3" in m for m in cm.output))
+        self.assertEqual(result, 5)
+        self.assertTrue(any("clamping to 5" in m for m in cm.output))
 
     @patch("tools.delegate_tool._load_config",
            return_value={"max_spawn_depth": "not-a-number"})

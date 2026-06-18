@@ -1049,15 +1049,28 @@ def get_gateway_runtime_snapshot(system: bool = False) -> GatewayRuntimeSnapshot
     from hermes_constants import is_container
 
     if is_linux() and is_container():
-        # Phase 4: report s6 supervision when running under our /init.
-        # Other container runtimes (or containers built before Phase 2)
-        # still get the original "docker (foreground)" label.
+        # Report container-supervised gateways through the actual s6 service
+        # state, not only process-table scans. Gateway status is commonly
+        # invoked from inside an active gateway turn; in that case the gateway
+        # PID is an ancestor of the CLI/tool subprocess and _scan_gateway_pids()
+        # intentionally excludes ancestors to avoid self-matches. The s6 slot is
+        # therefore the authoritative liveness source in containers.
         try:
-            from hermes_cli.service_manager import detect_service_manager
+            from hermes_cli.profiles import get_active_profile_name
+            from hermes_cli.service_manager import S6ServiceManager, detect_service_manager
+
             if detect_service_manager() == "s6":
+                profile = get_active_profile_name() or "default"
+                service_name = f"gateway-{profile}"
+                service_manager = S6ServiceManager()
+                service_installed = service_manager._service_dir(profile).is_dir()
+                service_running = service_installed and service_manager.is_running(service_name)
                 return GatewayRuntimeSnapshot(
                     manager="s6 (container supervisor)",
+                    service_installed=service_installed,
+                    service_running=service_running,
                     gateway_pids=gateway_pids,
+                    service_scope=service_name,
                 )
         except Exception:
             pass  # Fall through to the legacy label on any detection error.
@@ -6475,9 +6488,14 @@ def _gateway_command_inner(args):
             gateway_windows.status(deep=deep)
             _print_gateway_process_mismatch(snapshot)
         else:
-            # Check for manually running processes
+            # Check for container-supervised services or manually running processes.
             pids = list(snapshot.gateway_pids)
-            if pids:
+            if snapshot.service_running:
+                scope = f" ({snapshot.service_scope})" if snapshot.service_scope else ""
+                print(f"✓ Gateway is running via {snapshot.manager}{scope}")
+                if pids:
+                    print(f"  PID: {', '.join(map(str, pids))}")
+            elif pids:
                 print(f"✓ Gateway is running (PID: {', '.join(map(str, pids))})")
                 print("  (Running manually, not as a system service)")
                 runtime_lines = _runtime_health_lines()

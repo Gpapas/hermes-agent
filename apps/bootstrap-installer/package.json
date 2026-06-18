@@ -2,7 +2,7 @@
   "name": "@hermes/bootstrap-installer",
   "private": true,
   "version": "0.0.1",
-  "description": "Hermes Setup — signed installer that drives scripts/install.ps1 with a polished native UI.",
+  "description": "Hermes Setup \u2014 signed installer that drives scripts/install.ps1 with a polished native UI.",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5175",
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@nous-research/ui": "0.16.0",
-    "@tailwindcss/vite": "^4.2.1",
     "@tailwindcss/typography": "^0.5.19",
+    "@tailwindcss/vite": "^4.2.1",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-opener": "^2.0.0",
@@ -41,6 +41,6 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.5"
   }
 }

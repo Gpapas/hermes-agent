@@ -110,6 +110,18 @@ TOOLSETS = {
         "tools": ["x_search"],
         "includes": []
     },
+
+    "self_agent": {
+        "description": "Self.xyz Agent ID registration: start sessions, poll status, regenerate QR links, export server-generated keys, and request Ed25519 challenges.",
+        "tools": [
+            "self_agent_start_registration",
+            "self_agent_registration_status",
+            "self_agent_export_private_key",
+            "self_agent_ed25519_challenge",
+            "self_agent_registration_qr",
+        ],
+        "includes": [],
+    },
     
     "vision": {
         "description": "Image analysis and vision tools",
